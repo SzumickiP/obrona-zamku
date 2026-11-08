@@ -1335,6 +1335,7 @@ function sfx(k) {
       const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900; const g = a.createGain();
       g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.08, t + 0.08); g.gain.setValueAtTime(0.08, t + 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
       o.connect(f); f.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 1.25); break; }
+    case 'repair': for (let i = 0; i < 3; i++) { tone(a, t + i * 0.16, 0.07, 'square', 900, 700, 0.03); noise(a, t + i * 0.16, 0.06, 'bandpass', 3200, 0.05, 3); } break;
     case 'build': tone(a, t, 0.08, 'square', 300, 200, 0.04); tone(a, t + 0.09, 0.1, 'square', 260, 180, 0.04); break;
   }
 }
@@ -1348,7 +1349,7 @@ function reset() {
     state: 'menu', gold: LEVEL ? LEVEL.gold : 300, hp: 20, maxHp: 20, wave: 0, waveCleared: true,
     enemies: [], towers: [], proj: [], parts: [], ground: [], corpses: [], spawnQ: [], waveTime: 0,
     speed: 1, paused: false, time: S.time || 0, shake: 0, sel: null, hoverSlot: null, hoverTower: null, preview: null,
-    rains: [], targeting: null, mouse: { x: -999, y: -999 }, hornT: 0,
+    rains: [], targeting: null, mouse: { x: -999, y: -999 }, hornT: 0, repairs: 0,
     ab: { rain: { cd: 0, max: 40 }, horn: { cd: 0, max: 55 } },
     clouds: Array.from({ length: 4 }, (_, i) => ({ x: i * 380 + R(0, 200), y: R(100, 650), r: R(120, 200), v: R(8, 14) })),
   });
@@ -1425,6 +1426,23 @@ function castleHit(dmg) {
   updateHud();
   if (S.hp <= 0) endGame(false);
 }
+
+// Naprawa zamku: każda kolejna na tej planszy jest droższa, żeby nie dało się łatwo kupić gwiazdek
+const REPAIR_HP = 2;
+const repairCost = () => 50 + 25 * S.repairs;
+function repairCastle() {
+  if (S.state !== 'play' || S.paused || S.hp >= S.maxHp) return;
+  const cost = repairCost();
+  if (S.gold < cost) { showBanner(`Naprawa kosztuje ${cost} zł`); return; }
+  S.gold -= cost; S.repairs++;
+  const add = Math.min(REPAIR_HP, S.maxHp - S.hp);
+  S.hp += add;
+  sfx('repair');
+  floatText(130, 560, `+${add} zamek`, '#9fe08a');
+  for (let i = 0; i < 10; i++) S.parts.push({ k: 'spark', x: 130 + R(-90, 90), y: R(300, 560), vx: R(-40, 40), vy: R(-90, -30), g: 120, life: R(0.4, 0.8), t: 0 });
+  updateHud();
+}
+const castleAt = (x, y) => x < 255 && y > 240 && y < 670;
 
 function floatText(x, y, txt, col) { S.parts.push({ k: 'text', x, y, vx: 0, vy: -28, g: 0, life: 1.2, t: 0, txt, col }); }
 
@@ -1832,6 +1850,9 @@ function updateHud() {
   if (S.wave >= WAVES.length) { bw.textContent = 'Ostatnia fala'; bw.disabled = true; }
   else if (S.spawnQ.length) { bw.textContent = 'Fala trwa…'; bw.disabled = true; }
   else { bw.textContent = 'Wyślij falę ' + (S.wave + 1) + (S.enemies.length ? ' (+15)' : ''); bw.disabled = S.state !== 'play'; }
+  const br = $('btnRepair'), rc = repairCost();
+  br.textContent = S.hp >= S.maxHp ? 'Zamek cały' : `Napraw +${REPAIR_HP} (${rc} zł)`;
+  br.disabled = S.state !== 'play' || S.hp >= S.maxHp || S.gold < rc;
   if (S.sel) refreshMenu();
 }
 
@@ -1945,6 +1966,7 @@ cv.addEventListener('pointerdown', ev => {
   const t = towerAt(x, y); if (t) { openTowerMenu(t); return; }
   const s = slotAt(x, y); if (s) { openBuildMenu(s); return; }
   closeMenu();
+  if (castleAt(x, y)) repairCastle();
 });
 cv.addEventListener('pointermove', ev => {
   const { x, y } = gamePos(ev);
@@ -1952,7 +1974,7 @@ cv.addEventListener('pointermove', ev => {
   if (S.targeting) { S.hoverTower = S.hoverSlot = null; return; }
   S.hoverTower = towerAt(x, y);
   S.hoverSlot = S.hoverTower ? null : slotAt(x, y);
-  cv.style.cursor = (S.hoverTower || S.hoverSlot) ? 'pointer' : 'default';
+  cv.style.cursor = (S.hoverTower || S.hoverSlot || (S.state === 'play' && S.hp < S.maxHp && castleAt(x, y))) ? 'pointer' : 'default';
 });
 
 $('abRain').onclick = () => useAbility('rain');
@@ -1970,6 +1992,7 @@ $('btnWave').onclick = () => { ac(); if (AC && AC.state === 'suspended') AC.resu
 $('btnSpeed').onclick = () => { S.speed = S.speed === 1 ? 2 : S.speed === 2 ? 3 : 1; $('btnSpeed').textContent = '×' + S.speed; };
 function togglePause() { if (S.state !== 'play') return; S.paused = !S.paused; $('btnPause').textContent = S.paused ? 'Wznów' : 'Pauza'; if (S.paused) showBanner('Pauza'); }
 $('btnPause').onclick = togglePause;
+$('btnRepair').onclick = repairCastle;
 $('btnMute').onclick = () => { muted = !muted; $('btnMute').textContent = muted ? 'Dźwięk: wył.' : 'Dźwięk: wł.'; };
 window.addEventListener('keydown', ev => {
   if (ev.code === 'Space') { ev.preventDefault(); togglePause(); }
@@ -1977,6 +2000,7 @@ window.addEventListener('keydown', ev => {
   else if (ev.code === 'Escape') { closeMenu(); S.targeting = null; cv.style.cursor = 'default'; }
   else if (ev.code === 'KeyQ') useAbility('rain');
   else if (ev.code === 'KeyW') useAbility('horn');
+  else if (ev.code === 'KeyR') repairCastle();
 });
 
 // =====================================================================
@@ -2003,13 +2027,13 @@ function midWave() { return S.spawnQ.length > 0 || S.enemies.length > 0; }
 function saveCheckpoint() {
   if (!player || S.state !== 'play' || midWave()) return;
   player.save = {
-    level: LEVEL_I, gold: S.gold, hp: S.hp, wave: S.wave, ts: Date.now(),
+    level: LEVEL_I, gold: S.gold, hp: S.hp, wave: S.wave, repairs: S.repairs, ts: Date.now(),
     towers: S.towers.map(t => ({ s: SLOTS.indexOf(t.slot), type: t.type, lvl: t.lvl, spent: t.spent })),
   };
   saveDB();
 }
 function applySave(sv) {
-  S.gold = sv.gold; S.hp = sv.hp; S.wave = sv.wave; S.waveCleared = true;
+  S.gold = sv.gold; S.hp = sv.hp; S.wave = sv.wave; S.repairs = sv.repairs | 0; S.waveCleared = true;
   for (const d of sv.towers) {
     const slot = SLOTS[d.s]; if (!slot || slot.tower || !TT[d.type]) continue;
     const t = { type: d.type, lvl: clamp(d.lvl | 0, 0, 2), slot, x: slot.x, y: slot.y, cd: 0.4, fireT: 99, aimX: slot.x - 60, aimY: slot.y, spent: d.spent, target: null, af: [9, 9, 9], shot: 0 };
@@ -2091,6 +2115,7 @@ function showPlayerScreen(msg) {
     <li><b>Wrząca smoła</b>: parzy i spowalnia wrogów przy samej wieży.</li>
     <li><b>Deszcz strzał</b> (Q): wskaż miejsce na mapie, a łucznicy z murów zasypią je strzałami.</li>
     <li><b>Róg wojenny</b> (W): przez 8 sekund wszystkie wieże strzelają szybciej.</li>
+    <li><b>Naprawa zamku</b> (R albo kliknij zamek): +2 punkty wytrzymałości za złoto. Każda kolejna naprawa na planszy kosztuje więcej.</li>
     <li>Kliknij kamienne miejsce przy drodze, żeby zbudować wieżę. Kliknij wieżę, żeby ją ulepszyć albo sprzedać.</li>
     <li>Gwiazdki za planszę: 3 gdy zamek ma co najmniej 18 punktów, 2 od 10 punktów, 1 za samo zwycięstwo.</li>
     <li>Gra zapisuje się sama między falami. Jeśli wyjdziesz w trakcie fali, wrócisz do jej początku.</li></ul></details>`;
