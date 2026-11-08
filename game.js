@@ -208,6 +208,60 @@ const LEVELS = [
   { name: 'Zimowa Przełęcz', desc: 'Długa, kręta droga w śniegu. Tarany, ciężkozbrojni i dwóch Czarnych Lordów.', theme: 'winter', gold: 420, hpMul: 1.25, waves: W3,
     paths: [[[1350, 620], [1150, 640], [1000, 560], [1080, 420], [1180, 300], [1100, 170], [930, 130], [800, 220], [820, 380], [700, 470], [560, 420], [520, 280], [600, 150], [460, 110], [350, 200], [345, 350], [330, 470], ...GATE_APPROACH.slice(1)]] },
 ];
+// Generator fal dla dalszych plansz: budżet rośnie z każdą falą, tarany i ciężkozbrojni dopiero później
+const COST = { squire: 1, footman: 2.5, horse: 4, heavy: 7, ram: 13 };
+const GAP = { squire: 0.55, footman: 0.9, horse: 0.8, heavy: 1.6, ram: 3.8 };
+const PATTERNS = [
+  [['squire', 1]], [['squire', 0.5], ['footman', 0.5]],
+  [['footman', 0.6], ['horse', 0.4]], [['horse', 1]],
+  [['heavy', 0.6], ['footman', 0.4]], [['ram', 0.4], ['squire', 0.6]],
+  [['horse', 0.5], ['heavy', 0.5]], [['ram', 0.35], ['horse', 0.65]],
+  [['heavy', 0.7], ['ram', 0.3]], [['footman', 0.4], ['horse', 0.3], ['heavy', 0.3]],
+];
+function genWaves(N, diff, lords, sv) {
+  const out = [];
+  for (let w = 1; w <= N; w++) {
+    const prog = w / N;
+    const budget = diff * (8 + 230 * Math.pow(prog, 1.6));
+    const allowed = prog < 0.2 ? 2 : prog < 0.4 ? 4 : prog < 0.55 ? 6 : 10;
+    const pat = PATTERNS[(w * 7 + sv) % allowed];
+    const groups = pat.map(([t, share]) => ({ t, n: clamp(Math.round(budget * share / COST[t]), 1, 40), gap: GAP[t] }));
+    if (w === N) groups.splice(1, 0, { t: 'lord', n: lords, gap: 6 });
+    else if (lords >= 2 && w === Math.round(N * 0.66)) groups.splice(1, 0, { t: 'lord', n: 1, gap: 4 });
+    out.push(groups);
+  }
+  return out;
+}
+LEVELS.push(
+  { name: 'Jesienny Las', desc: 'Dwie leśne drogi łączą się w połowie drogi do zamku.', theme: 'autumn', gold: 450, hpMul: 1.3, waves: genWaves(15, 1.0, 1, 1),
+    paths: [
+      [[1350, 130], [1150, 140], [1010, 240], [880, 200], [740, 150], [620, 230], [580, 330], [480, 300], [385, 350], [345, 450], ...GATE_APPROACH],
+      [[1350, 600], [1180, 620], [1050, 530], [900, 560], [760, 630], [640, 560], [600, 440], [580, 330], [480, 300], [385, 350], [345, 450], ...GATE_APPROACH],
+    ] },
+  { name: 'Młyn nad Rzeką', desc: 'Jedna droga dwa razy przekracza rzekę. Mosty to dobre miejsca na zasadzki.', theme: 'summer', gold: 480, hpMul: 1.38, waves: genWaves(15, 1.05, 1, 3),
+    river: [[1340, 380], [1100, 350], [900, 400], [700, 370], [540, 420], [490, 560], [475, 770]],
+    paths: [[[1350, 150], [1120, 160], [980, 250], [960, 330], [1000, 470], [1120, 560], [1000, 640], [820, 630], [700, 560], [680, 450], [640, 300], [520, 220], [420, 260], [350, 340], [335, 450], ...GATE_APPROACH]] },
+  { name: 'Wrzosowe Wzgórza', desc: 'Bardzo długa droga wije się zakosami przez całe wzgórza.', theme: 'autumn', gold: 500, hpMul: 1.46, waves: genWaves(16, 1.1, 2, 5),
+    paths: [[[1350, 115], [1050, 120], [700, 125], [460, 150], [430, 240], [560, 295], [880, 290], [1150, 320], [1190, 420], [1060, 480], [760, 470], [520, 500], [440, 600], [340, 640], [255, 624], [190, 630], [128, 622]]] },
+  { name: 'Śnieżna Dolina', desc: 'Trzy drogi schodzą do doliny i łączą się tuż przed zamkiem.', theme: 'winter', gold: 540, hpMul: 1.54, waves: genWaves(16, 1.15, 2, 2),
+    paths: [
+      [[1350, 120], [1150, 130], [950, 200], [760, 180], [600, 230], [520, 380], [420, 330], [350, 400], [335, 470], ...GATE_APPROACH],
+      [[1350, 380], [1150, 360], [960, 410], [780, 380], [640, 380], [520, 380], [420, 330], [350, 400], [335, 470], ...GATE_APPROACH],
+      [[1350, 640], [1150, 650], [950, 590], [760, 620], [620, 560], [520, 380], [420, 330], [350, 400], [335, 470], ...GATE_APPROACH],
+    ] },
+  { name: 'Krwawy Brzeg', desc: 'Dwie drogi przez rzekę i wzgórza. Wróg rzuca do boju coraz więcej taranów.', theme: 'autumn', gold: 560, hpMul: 1.62, waves: genWaves(17, 1.2, 2, 7),
+    river: [[700, -40], [680, 200], [720, 420], [690, 770]],
+    paths: [
+      [[1350, 200], [1150, 120], [950, 200], [820, 330], [600, 320], [480, 220], [380, 280], [345, 400], [335, 470], ...GATE_APPROACH],
+      [[1350, 520], [1150, 600], [1000, 520], [880, 640], [600, 640], [480, 560], [380, 600], [300, 632], [255, 620], [190, 630], [128, 622]],
+    ] },
+  { name: 'Ostatnie Oblężenie', desc: 'Nocny szturm z trzech stron i trzech Czarnych Lordów. Finał kampanii.', theme: 'night', gold: 600, hpMul: 1.7, waves: genWaves(18, 1.3, 3, 4),
+    paths: [
+      [[1350, 100], [1100, 170], [880, 110], [700, 180], [560, 160], [440, 220], [400, 400], [345, 460], ...GATE_APPROACH],
+      [[1350, 400], [1180, 300], [1000, 380], [840, 320], [700, 390], [560, 330], [400, 400], [345, 460], ...GATE_APPROACH],
+      [[1350, 660], [1120, 600], [950, 660], [780, 580], [640, 600], [500, 520], [400, 400], [345, 460], ...GATE_APPROACH],
+    ] },
+);
 let WAVES = W1;
 
 // Wygląd postaci
@@ -1025,17 +1079,18 @@ function tree(c, x, y, s) {
   c.fillStyle = 'rgba(0,0,0,0.28)'; ell(c, x + 10 * s, y + 2 * s, 22 * s, 8 * s); c.fill();
   c.fillStyle = '#4a3520'; c.beginPath(); c.moveTo(x - 3 * s, y); c.lineTo(x - 1.8 * s, y - 20 * s); c.lineTo(x + 1.8 * s, y - 20 * s); c.lineTo(x + 3 * s, y); c.closePath(); c.fill();
   c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x + 0.5 * s, y - 20 * s, 1.5 * s, 20 * s);
+  const pal = AUTUMN ? AUT_PALS[Math.floor(srnd() * AUT_PALS.length)] : ['#86ad55', '#4d7a2e', '#2a4a1a'];
   const blobs = [];
   for (let k = 0; k < 8; k++) blobs.push({ x: x + SR(-13, 13) * s, y: y - 28 * s + SR(-12, 8) * s, r: SR(8, 13) * s });
   blobs.sort((a, b) => a.y - b.y);
   for (const b of blobs) {
     const g = c.createRadialGradient(b.x - b.r * 0.4, b.y - b.r * 0.45, b.r * 0.1, b.x, b.y, b.r);
-    g.addColorStop(0, '#86ad55'); g.addColorStop(0.55, '#4d7a2e'); g.addColorStop(1, '#2a4a1a');
+    g.addColorStop(0, pal[0]); g.addColorStop(0.55, pal[1]); g.addColorStop(1, pal[2]);
     c.fillStyle = g; circ(c, b.x, b.y, b.r); c.fill();
   }
   for (let k = 0; k < 45; k++) {
     const a = SR(0, TAU), r = SR(0, 18) * s;
-    c.fillStyle = srnd() < 0.5 ? 'rgba(160,200,100,0.45)' : 'rgba(20,40,12,0.4)';
+    c.fillStyle = srnd() < 0.5 ? (AUTUMN ? 'rgba(255,220,130,0.45)' : 'rgba(160,200,100,0.45)') : 'rgba(20,40,12,0.4)';
     circ(c, x + Math.cos(a) * r, y - 28 * s + Math.sin(a) * r * 0.8, SR(0.6, 1.6) * s); c.fill();
   }
 }
@@ -1067,11 +1122,12 @@ function bush(c, x, y, s) {
   for (let k = 0; k < 4; k++) {
     const bx = x + SR(-6, 6) * s, by = y - SR(3, 7) * s, r = SR(4, 6) * s;
     const g = c.createRadialGradient(bx - r * 0.4, by - r * 0.4, 0, bx, by, r);
-    g.addColorStop(0, '#7fa24e'); g.addColorStop(1, '#2d4c1c');
+    g.addColorStop(0, AUTUMN ? '#c08a3a' : '#7fa24e'); g.addColorStop(1, AUTUMN ? '#5a3214' : '#2d4c1c');
     c.fillStyle = g; circ(c, bx, by, r); c.fill();
   }
 }
-let SNOW = false;
+let SNOW = false, AUTUMN = false, NIGHT = false;
+const AUT_PALS = [['#f0b048', '#c0701e', '#5a2e0e'], ['#e6cf60', '#ad8c28', '#4e3d12'], ['#d8602e', '#9a321a', '#4a160c'], ['#9cb455', '#6a8030', '#2e4a1a'], ['#e88a3a', '#b04a1c', '#52200c']];
 function pathLine(c, P, off) {
   c.beginPath();
   for (let i = 0; i < P.pts.length; i++) { const p = P.pts[i], n = P.norm[i]; const x = p.x + n.x * off, y = p.y + n.y * off; i ? c.lineTo(x, y) : c.moveTo(x, y); }
@@ -1082,13 +1138,13 @@ function renderBg() {
   const c = bg.getContext('2d');
   c.setTransform(BGS, 0, 0, BGS, 0, 0);
   seed = 11 + LEVEL_I * 101;
-  SNOW = LEVEL.theme === 'winter';
-  c.fillStyle = SNOW ? '#dde5ea' : '#58763a'; c.fillRect(0, 0, W, H);
+  SNOW = LEVEL.theme === 'winter'; AUTUMN = LEVEL.theme === 'autumn'; NIGHT = LEVEL.theme === 'night';
+  c.fillStyle = SNOW ? '#dde5ea' : AUTUMN ? '#6f6c34' : '#58763a'; c.fillRect(0, 0, W, H);
   for (let i = 0; i < 90; i++) {
     const x = SR(0, W), y = SR(0, H), r = SR(40, 150);
     const g = c.createRadialGradient(x, y, 0, x, y, r);
     const light = srnd() < 0.5;
-    g.addColorStop(0, SNOW ? (light ? 'rgba(255,255,255,0.5)' : 'rgba(140,160,185,0.18)') : (light ? 'rgba(150,175,85,0.22)' : 'rgba(30,50,20,0.22)'));
+    g.addColorStop(0, SNOW ? (light ? 'rgba(255,255,255,0.5)' : 'rgba(140,160,185,0.18)') : AUTUMN ? (light ? 'rgba(200,165,70,0.24)' : 'rgba(60,45,20,0.24)') : (light ? 'rgba(150,175,85,0.22)' : 'rgba(30,50,20,0.22)'));
     g.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = g; c.fillRect(x - r, y - r, 2 * r, 2 * r);
   }
@@ -1099,11 +1155,15 @@ function renderBg() {
       c.fillStyle = v < 0.5 ? 'rgba(255,255,255,0.7)' : v < 0.85 ? 'rgba(160,178,198,0.3)' : 'rgba(90,110,80,0.25)';
       c.fillRect(x, y, SR(0.8, 2.2), SR(0.6, 1.2));
     } else {
-      c.strokeStyle = v < 0.33 ? 'rgba(40,66,26,0.5)' : v < 0.66 ? 'rgba(108,140,62,0.45)' : 'rgba(155,175,95,0.35)';
+      c.strokeStyle = AUTUMN ? (v < 0.33 ? 'rgba(80,70,28,0.5)' : v < 0.66 ? 'rgba(150,130,52,0.45)' : 'rgba(195,155,65,0.35)')
+        : v < 0.33 ? 'rgba(40,66,26,0.5)' : v < 0.66 ? 'rgba(108,140,62,0.45)' : 'rgba(155,175,95,0.35)';
       line(c, x, y, x + SR(-1.5, 1.5), y - SR(2, 5));
     }
   }
-  if (!SNOW) for (let i = 0; i < 300; i++) {
+  if (AUTUMN) for (let i = 0; i < 1400; i++) {
+    const v = srnd(); c.fillStyle = v < 0.35 ? 'rgba(220,120,40,0.8)' : v < 0.7 ? 'rgba(230,190,70,0.8)' : 'rgba(170,60,30,0.8)';
+    const x = SR(0, W), y = SR(0, H); c.beginPath(); c.ellipse(x, y, SR(1, 2.2), SR(0.6, 1.2), SR(0, 3), 0, TAU); c.fill();
+  } else if (!SNOW) for (let i = 0; i < 300; i++) {
     const v = srnd(); c.fillStyle = v < 0.4 ? 'rgba(255,255,240,0.8)' : v < 0.75 ? 'rgba(250,220,80,0.8)' : 'rgba(170,120,210,0.8)';
     circ(c, SR(0, W), SR(0, H), SR(0.6, 1.2)); c.fill();
   }
@@ -1163,8 +1223,9 @@ function renderBg() {
   if (RIVER) for (const P of PATHS) {
     const on = [];
     for (let i = 0; i < P.pts.length; i++) if (distToRiver(P.pts[i].x, P.pts[i].y) < 36) on.push(i);
-    if (!on.length) continue;
-    const i0 = on[0], i1 = on[on.length - 1];
+    const runs = [];
+    for (const i of on) { const r = runs[runs.length - 1]; if (r && i - r[1] <= 2) r[1] = i; else runs.push([i, i]); }
+    for (const [i0, i1] of runs) {
     for (let i = i0; i <= i1; i++) {
       const p = P.pts[i], n = P.norm[i];
       c.strokeStyle = (i % 2) ? '#7a5634' : '#6b4a2b'; c.lineWidth = 7.5;
@@ -1177,6 +1238,7 @@ function renderBg() {
       for (let i = i0; i <= i1; i++) { const p = P.pts[i], n = P.norm[i]; const x = p.x + n.x * 32 * side, y = p.y + n.y * 32 * side - 6; i === i0 ? c.moveTo(x, y) : c.lineTo(x, y); }
       c.strokeStyle = '#4a3019'; c.lineWidth = 2.6; c.stroke();
       for (let i = i0; i <= i1; i += 3) { const p = P.pts[i], n = P.norm[i]; const x = p.x + n.x * 32 * side, y = p.y + n.y * 32 * side; c.strokeStyle = '#3a2412'; c.lineWidth = 2.4; line(c, x, y, x, y - 7); }
+    }
     }
   }
   // miejsca pod wieże
@@ -1221,7 +1283,7 @@ function renderBg() {
     else rock(c, o.x, o.y, o.s);
   }
   const v = c.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 0.95);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, SNOW ? 'rgba(20,30,50,0.35)' : 'rgba(10,5,0,0.4)');
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, SNOW || NIGHT ? 'rgba(20,30,50,0.35)' : 'rgba(10,5,0,0.4)');
   c.fillStyle = v; c.fillRect(0, 0, W, H);
 }
 
@@ -1680,7 +1742,28 @@ function render() {
   for (const o of list) { if (o.t) drawTower(ctx, o.t); else drawEnemy(o.e); }
 
   for (const p of S.proj) drawProj(p);
+  if (NIGHT) {
+    ctx.fillStyle = 'rgba(8,14,42,0.42)'; ctx.fillRect(-10, -10, W + 20, H + 20);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const fl = 0.85 + Math.sin(S.time * 13) * 0.08 + Math.sin(S.time * 5.3) * 0.07;
+    const glow = (x, y, r, a) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(255,150,60,${a * fl})`); g.addColorStop(1, 'rgba(255,120,40,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, 2 * r, 2 * r); };
+    for (const [x, y] of [[115, 310], [80, 377], [150, 377], [128, 492], [104, 590], [152, 590]]) glow(x, y, 26, 0.35);
+    for (const t of S.towers) glow(t.x, t.y - towerHeight(t) - 4, 34, 0.28);
+    for (const g of S.ground) if (g.k === 'puddle') glow(g.x, g.y, g.r * 1.6, 0.4 * (1 - g.t / g.life));
+    ctx.restore();
+    ctx.fillStyle = 'rgba(240,240,220,0.9)'; circ(ctx, 1180, 92, 16); ctx.fill();
+    ctx.fillStyle = 'rgba(8,14,42,0.25)'; circ(ctx, 1186, 88, 13); ctx.fill();
+  }
   for (const q of S.parts) drawPart(q);
+  if (AUTUMN) {
+    for (let i = 0; i < 40; i++) {
+      const x = ((i * 733 - S.time * (25 + i % 4 * 8)) % (W + 40) + W + 40) % (W + 40) - 20;
+      const y = ((i * 389 + S.time * (18 + i % 5 * 5)) % (H + 20)) - 10;
+      const rot = S.time * (1 + i % 3) + i;
+      ctx.fillStyle = ['rgba(225,130,40,0.85)', 'rgba(235,195,70,0.85)', 'rgba(180,60,30,0.85)'][i % 3];
+      ctx.beginPath(); ctx.ellipse(x, y, 2.6, 1.2, rot, 0, TAU); ctx.fill();
+    }
+  }
   for (const r of S.rains) {
     const a = Math.max(0, 1 - r.t / 1.2);
     ctx.strokeStyle = `rgba(255,220,140,${0.5 * a})`; ctx.lineWidth = 2; ell(ctx, r.x, r.y, RAIN_R, RAIN_R * 0.45); ctx.stroke();
